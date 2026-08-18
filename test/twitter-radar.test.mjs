@@ -49,6 +49,16 @@ function countResponse(matchedPostCounts) {
   });
 }
 
+function realCountResponse(counts, total) {
+  return countResponse({
+    __typename: "InsightsMatchedPostCountsSuccess",
+    counts,
+    has_incomplete_counts: false,
+    oldest_complete_count: counts[0]?.start_time,
+    total,
+  });
+}
+
 function deleteResponse(restId = "temporary-rule-123") {
   return jsonResponse({
     data: {
@@ -290,6 +300,30 @@ test("radar polls until counts arrive and marks only prior UTC days complete", a
     id: "temporary-rule-123",
     timezone_offset: 0,
   });
+});
+
+test("radar parses the live matched_post_counts envelope and start_time buckets", async () => {
+  const liveBuckets = READY_BUCKETS.map(({ timestamp, count }) => ({
+    start_time: timestamp,
+    count,
+  }));
+  const { fetchImpl } = queuedFetch([
+    createResponse(),
+    realCountResponse(liveBuckets, 28),
+    deleteResponse(),
+  ]);
+  const { adapter } = await loadRadarAdapter({ fetchImpl });
+
+  const result = plain(await adapter({ query: QUERY }));
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.total_posts, 28);
+  assert.deepEqual(result.daily_counts.at(-1), {
+    date: "2026-08-18",
+    count: 7,
+    complete: false,
+  });
+  assert.equal(result.cleanup_status, "deleted");
 });
 
 test("radar preserves explicit zero counts but never invents zero for a missing count", async () => {

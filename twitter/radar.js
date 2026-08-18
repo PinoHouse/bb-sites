@@ -42,7 +42,7 @@ async function(args) {
     return new Promise(resolve => setTimeout(resolve, milliseconds));
   }
 
-  function normalizeCounts(buckets, utcTodayStartMs) {
+  function normalizeCounts(buckets, utcTodayStartMs, sourceTotal) {
     const dailyCounts = [];
     let total = 0;
     let complete = true;
@@ -52,7 +52,7 @@ async function(args) {
         complete = false;
         continue;
       }
-      const rawTimestamp = bucket.timestamp;
+      const rawTimestamp = bucket.start_time ?? bucket.timestamp;
       const timestampMs = typeof rawTimestamp === 'number'
         ? (rawTimestamp < 1000000000000 ? rawTimestamp * 1000 : rawTimestamp)
         : Date.parse(rawTimestamp);
@@ -72,7 +72,9 @@ async function(args) {
     return {
       usable: dailyCounts.length > 0,
       daily_counts: dailyCounts,
-      total_posts: complete && dailyCounts.length === buckets.length ? total : null
+      total_posts: typeof sourceTotal === 'number' && Number.isFinite(sourceTotal)
+        ? sourceTotal
+        : (complete && dailyCounts.length === buckets.length ? total : null)
     };
   }
 
@@ -195,12 +197,27 @@ async function(args) {
       }
 
       const matchedPostCounts = countResult.payload?.data?.viewer_v2?.user_results?.result?.insight_rule_by_id?.matched_post_counts;
-      if (matchedPostCounts !== null && matchedPostCounts !== undefined && !Array.isArray(matchedPostCounts)) {
+      let countBuckets = null;
+      let sourceTotal = null;
+      if (Array.isArray(matchedPostCounts)) {
+        countBuckets = matchedPostCounts;
+      } else if (matchedPostCounts && typeof matchedPostCounts === 'object') {
+        if (Array.isArray(matchedPostCounts.counts)) {
+          countBuckets = matchedPostCounts.counts;
+          sourceTotal = matchedPostCounts.total;
+        } else if (String(matchedPostCounts.__typename || '').includes('Failure')) {
+          outcome = {
+            query,
+            status: classifyRelayFailure({errors: [matchedPostCounts]}) || 'upstream_changed'
+          };
+          break;
+        }
+      } else if (matchedPostCounts !== null && matchedPostCounts !== undefined) {
         outcome = {query, status: 'upstream_changed'};
         break;
       }
-      if (Array.isArray(matchedPostCounts)) {
-        const normalized = normalizeCounts(matchedPostCounts, utcTodayStartMs);
+      if (Array.isArray(countBuckets)) {
+        const normalized = normalizeCounts(countBuckets, utcTodayStartMs, sourceTotal);
         if (normalized.usable) {
           outcome = {
             query,
