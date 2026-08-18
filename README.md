@@ -6,7 +6,7 @@ Each site adapter is a JS function that runs inside your browser via `bb-browser
 
 [English](README.md) · [中文](README.zh-CN.md)
 
-> **102 adapters** across **36 platforms** — and growing.
+> **103 adapters** across **36 platforms** — and growing.
 
 ## Quick Start
 
@@ -42,7 +42,7 @@ bb-browser site reddit/thread <url>        # run with args
 
 | Platform | Commands | Description |
 |----------|----------|-------------|
-| Twitter/X | `twitter/user`, `twitter/thread`, `twitter/search`, `twitter/tweets`, `twitter/notifications` | User profile, tweet threads, search, timeline, notifications |
+| Twitter/X | `twitter/user`, `twitter/thread`, `twitter/search`, `twitter/tweets`, `twitter/notifications`, `twitter/radar` | User profile, tweet threads, search, timeline, notifications, and temporary-rule seven-day Radar counts |
 | Reddit | `reddit/me`, `reddit/posts`, `reddit/thread`, `reddit/context` | User info, posts, discussion trees, comment chains |
 | Weibo | `weibo/me`, `weibo/hot`, `weibo/feed`, `weibo/user`, `weibo/user_posts`, `weibo/post`, `weibo/comments` | Full Weibo (微博) support — profile, trending, timeline, posts, comments |
 | Mobile Weibo | `m_weibo/me`, `m_weibo/hot`, `m_weibo/feed`, `m_weibo/search`, `m_weibo/user`, `m_weibo/user_posts`, `m_weibo/comments` | Mobile-optimized Weibo (微博手机版) — resilient JSON APIs |
