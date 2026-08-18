@@ -25,7 +25,9 @@ async function(args) {
     verified_phone_label_enabled: false, responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
     responsive_web_graphql_timeline_navigation_enabled: true
   });
-  const queryId = findGraphQLQueryId('UserByScreenName', 'pLsOiyHJ1eFwPJlNmLp4Bg');
+  const queryId = typeof findGraphQLQueryId === 'function'
+    ? findGraphQLQueryId('UserByScreenName', 'pLsOiyHJ1eFwPJlNmLp4Bg')
+    : 'pLsOiyHJ1eFwPJlNmLp4Bg';
   const url = '/i/api/graphql/' + queryId + '/UserByScreenName?variables=' + encodeURIComponent(variables) + '&features=' + encodeURIComponent(features);
   const resp = await fetch(url, {headers: _h, credentials: 'include'});
   if (!resp.ok) return {error: 'HTTP ' + resp.status, hint: 'queryId may have changed. Check network tab.'};

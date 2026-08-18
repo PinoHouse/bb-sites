@@ -19,8 +19,69 @@ async function(args) {
   const ct0 = document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('ct0='))?.split('=')[1];
   if (!ct0) return {error: 'No ct0 cookie', hint: 'Please log in to https://x.com first.'};
 
-  const genTxId = await findTransactionIdGenerator();
-  const queryId = findGraphQLQueryId('SearchTimeline', 'Yw6L66Pw54NHKuq4Dp7b4Q');
+  function getWebpackRequire() {
+    let webpackRequire;
+    window.webpackChunk_twitter_responsive_web.push(
+      [['__bb_search_compat_' + Date.now()], {}, req => { webpackRequire = req; }]
+    );
+    return webpackRequire;
+  }
+
+  function discoverQueryId(operationName, fallbackQueryId) {
+    try {
+      const req = getWebpackRequire();
+      const op = operationName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const patterns = [
+        new RegExp('queryId:\\s*"([^"]+)"\\s*,\\s*operationName:\\s*"' + op + '"'),
+        new RegExp('operationName:\\s*"' + op + '"\\s*,\\s*queryId:\\s*"([^"]+)"'),
+        new RegExp('params:\\s*\\{\\s*id:\\s*"([^"]+)"\\s*,\\s*metadata:\\s*\\{[^}]*\\}\\s*,\\s*name:\\s*"' + op + '"'),
+        new RegExp('name:\\s*"' + op + '"[^}]*operationKind:\\s*"(?:query|mutation)"[^}]*id:\\s*"([^"]+)"')
+      ];
+      for (const id of Object.keys(req.m)) {
+        try {
+          const source = req.m[id].toString();
+          if (!source.includes(operationName)) continue;
+          for (const pattern of patterns) {
+            const match = source.match(pattern);
+            if (match) return match[1];
+          }
+        } catch {}
+      }
+    } catch {}
+    return fallbackQueryId;
+  }
+
+  async function discoverTransactionIdGenerator() {
+    try {
+      const req = getWebpackRequire();
+      for (const id of Object.keys(req.m)) {
+        try {
+          const source = req.m[id].toString();
+          if (!source.includes('x-client-transaction-id') || !source.includes('rweb_client_transaction_id_enabled')) continue;
+          const moduleExports = req(id);
+          for (const candidate of Object.values(moduleExports)) {
+            if (typeof candidate !== 'function') continue;
+            try {
+              const sample = await candidate('x.com', '/i/api/graphql/test/Op', 'GET');
+              if (typeof sample !== 'string' || sample.length < 40) continue;
+              try { if (atob(sample).startsWith('e:')) continue; } catch {}
+              return candidate;
+            } catch {}
+          }
+        } catch {}
+      }
+    } catch {}
+    return null;
+  }
+
+  const queryIdResolver = typeof findGraphQLQueryId === 'function'
+    ? findGraphQLQueryId
+    : discoverQueryId;
+  const transactionIdResolver = typeof findTransactionIdGenerator === 'function'
+    ? findTransactionIdGenerator
+    : discoverTransactionIdGenerator;
+  const genTxId = await transactionIdResolver();
+  const queryId = queryIdResolver('SearchTimeline', 'Yw6L66Pw54NHKuq4Dp7b4Q');
   if (!genTxId) return {error: 'Cannot find transaction-id generator', hint: 'x.com webpack structure may have changed'};
   if (!queryId) return {error: 'Cannot find SearchTimeline queryId', hint: 'x.com API structure may have changed'};
 

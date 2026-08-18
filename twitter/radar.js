@@ -78,15 +78,77 @@ async function(args) {
     };
   }
 
+  function getWebpackRequire() {
+    let webpackRequire;
+    window.webpackChunk_twitter_responsive_web.push(
+      [['__bb_radar_compat_' + Date.now()], {}, req => { webpackRequire = req; }]
+    );
+    return webpackRequire;
+  }
+
+  function discoverQueryId(operationName) {
+    try {
+      const req = getWebpackRequire();
+      const op = operationName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const patterns = [
+        new RegExp('queryId:\\s*"([^"]+)"\\s*,\\s*operationName:\\s*"' + op + '"'),
+        new RegExp('operationName:\\s*"' + op + '"\\s*,\\s*queryId:\\s*"([^"]+)"'),
+        new RegExp('params:\\s*\\{\\s*id:\\s*"([^"]+)"\\s*,\\s*metadata:\\s*\\{[^}]*\\}\\s*,\\s*name:\\s*"' + op + '"'),
+        new RegExp('name:\\s*"' + op + '"[^}]*operationKind:\\s*"(?:query|mutation)"[^}]*id:\\s*"([^"]+)"')
+      ];
+      for (const id of Object.keys(req.m)) {
+        try {
+          const source = req.m[id].toString();
+          if (!source.includes(operationName)) continue;
+          for (const pattern of patterns) {
+            const match = source.match(pattern);
+            if (match) return match[1];
+          }
+        } catch {}
+      }
+    } catch {}
+    return undefined;
+  }
+
+  async function discoverTransactionIdGenerator() {
+    try {
+      const req = getWebpackRequire();
+      for (const id of Object.keys(req.m)) {
+        try {
+          const source = req.m[id].toString();
+          if (!source.includes('x-client-transaction-id') || !source.includes('rweb_client_transaction_id_enabled')) continue;
+          const moduleExports = req(id);
+          for (const candidate of Object.values(moduleExports)) {
+            if (typeof candidate !== 'function') continue;
+            try {
+              const sample = await candidate('x.com', '/i/api/graphql/test/Op', 'GET');
+              if (typeof sample !== 'string' || sample.length < 40) continue;
+              try { if (atob(sample).startsWith('e:')) continue; } catch {}
+              return candidate;
+            } catch {}
+          }
+        } catch {}
+      }
+    } catch {}
+    return null;
+  }
+
+  const queryIdResolver = typeof findGraphQLQueryId === 'function'
+    ? findGraphQLQueryId
+    : discoverQueryId;
+  const transactionIdResolver = typeof findTransactionIdGenerator === 'function'
+    ? findTransactionIdGenerator
+    : discoverTransactionIdGenerator;
+
   let operationIds;
   let transactionIdGenerator;
   try {
     operationIds = {
-      create: findGraphQLQueryId('createInsightInputMutation'),
-      count: findGraphQLQueryId('usePostCountQuery'),
-      delete: findGraphQLQueryId('deleteInsightButtonMutation')
+      create: queryIdResolver('createInsightInputMutation'),
+      count: queryIdResolver('usePostCountQuery'),
+      delete: queryIdResolver('deleteInsightButtonMutation')
     };
-    transactionIdGenerator = await findTransactionIdGenerator();
+    transactionIdGenerator = await transactionIdResolver();
   } catch {
     return {query, status: 'upstream_changed'};
   }
@@ -147,7 +209,7 @@ async function(args) {
   const utcTodayStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const fromSeconds = Math.floor(utcTodayStartMs / 1000) - 6 * 86400;
   const toSeconds = Math.floor(nowMs / 1000);
-  const window = {
+  const countWindow = {
     from: new Date(fromSeconds * 1000).toISOString(),
     to: new Date(nowMs).toISOString(),
     timezone: 'UTC'
@@ -224,7 +286,7 @@ async function(args) {
           outcome = {
             query,
             observed_at: new Date(nowMs).toISOString(),
-            window,
+            window: countWindow,
             total_posts: normalized.total_posts,
             daily_counts: normalized.daily_counts,
             status: 'ok'

@@ -31,7 +31,9 @@ async function(args) {
     longform_notetweets_inline_media_enabled: true, freedom_of_speech_not_reach_fetch_enabled: true
   });
   const fieldToggles = JSON.stringify({withArticleRichContentState: true, withArticlePlainText: false});
-  const tweetDetailQueryId = findGraphQLQueryId('TweetDetail', 'nBS-WpgA6ZG0CyNHD517JQ');
+  const tweetDetailQueryId = typeof findGraphQLQueryId === 'function'
+    ? findGraphQLQueryId('TweetDetail', 'nBS-WpgA6ZG0CyNHD517JQ')
+    : 'nBS-WpgA6ZG0CyNHD517JQ';
 
   let tweets = [], seen = new Set(), cursor = null, maxPages = 5;
 
