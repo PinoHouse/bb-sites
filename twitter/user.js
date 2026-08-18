@@ -33,7 +33,15 @@ async function(args) {
   const u = d.data?.user?.result;
   if (!u) return {error: 'User not found', hint: 'Check spelling: @' + args.screen_name};
   const l = u.legacy || {};
-  return {id: u.rest_id, name: l.name, screen_name: l.screen_name, bio: l.description,
-    url: 'https://x.com/' + l.screen_name,
-    followers: l.followers_count, following: l.friends_count, tweets: l.statuses_count, verified: u.is_blue_verified};
+  const core = u.core || {};
+  const relationshipCounts = u.relationship_counts || {};
+  const tweetCounts = u.tweet_counts || {};
+  const screenName = l.screen_name || core.screen_name || args.screen_name;
+  return {id: u.rest_id, name: l.name || core.name, screen_name: screenName,
+    bio: l.description || u.profile_bio?.description,
+    url: 'https://x.com/' + screenName,
+    followers: l.followers_count ?? relationshipCounts.followers,
+    following: l.friends_count ?? relationshipCounts.following,
+    tweets: l.statuses_count ?? tweetCounts.tweets,
+    verified: u.is_blue_verified ?? u.verification?.verified};
 }
