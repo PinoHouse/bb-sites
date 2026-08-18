@@ -96,14 +96,15 @@ async function(args) {
 
   const bearer = decodeURIComponent('AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA');
 
-  async function requestJson(operationName, operationId, method, requestData) {
+  async function requestJson(operationName, operationId, method, requestData, allowRetry = true) {
     const path = '/i/api/graphql/' + operationId + '/' + operationName;
     let url = path;
     if (method === 'GET') {
       url += '?variables=' + encodeURIComponent(JSON.stringify(requestData));
     }
 
-    for (let attempt = 0; attempt < 2; attempt++) {
+    const maxAttempts = allowRetry ? 2 : 1;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       let response;
       try {
         const transactionId = await transactionIdGenerator('x.com', path, method);
@@ -119,12 +120,12 @@ async function(args) {
         if (method === 'POST') options.body = JSON.stringify(requestData);
         response = await fetch(url, options);
       } catch {
-        if (attempt === 0) continue;
+        if (attempt + 1 < maxAttempts) continue;
         return {ok: false, status: 'network_error'};
       }
 
       if (!response.ok) {
-        if (response.status >= 500 && attempt === 0) continue;
+        if (response.status >= 500 && attempt + 1 < maxAttempts) continue;
         return {ok: false, status: classifyHttpStatus(response.status)};
       }
 
@@ -165,7 +166,8 @@ async function(args) {
     'createInsightInputMutation',
     operationIds.create,
     'POST',
-    createBody
+    createBody,
+    false
   );
   if (!createResult.ok) return {query, status: createResult.status};
 

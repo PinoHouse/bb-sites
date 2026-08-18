@@ -346,14 +346,26 @@ test("radar preserves explicit zero counts but never invents zero for a missing 
   ]);
 });
 
+test("radar never retries the non-idempotent create mutation", async () => {
+  const { calls, fetchImpl } = queuedFetch([
+    new Error("response lost after create"),
+  ]);
+  const { adapter } = await loadRadarAdapter({ fetchImpl });
+
+  const result = await adapter({ query: QUERY });
+
+  assert.equal(result.status, "network_error");
+  assert.equal(calls.length, 1);
+});
+
 for (const [name, transientFailure] of [
   ["a thrown fetch", new Error("socket reset")],
   ["HTTP 503", jsonResponse({ error: "unavailable" }, 503)],
 ]) {
   test(`radar retries ${name} exactly once`, async () => {
     const { calls, fetchImpl } = queuedFetch([
-      transientFailure,
       createResponse(),
+      transientFailure,
       countResponse(READY_BUCKETS),
       deleteResponse(),
     ]);
@@ -363,7 +375,7 @@ for (const [name, transientFailure] of [
 
     assert.equal(result.status, "ok");
     assert.equal(calls.length, 4);
-    assert.equal(calls[0].url, calls[1].url);
+    assert.equal(calls[1].url, calls[2].url);
   });
 }
 
