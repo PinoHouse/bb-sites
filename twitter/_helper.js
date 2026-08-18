@@ -15,7 +15,9 @@ function findGraphQLQueryId(operationName, fallbackQueryId) {
     const op = operationName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const patterns = [
       new RegExp('queryId:\\s*"([^"]+)"\\s*,\\s*operationName:\\s*"' + op + '"'),
-      new RegExp('operationName:\\s*"' + op + '"\\s*,\\s*queryId:\\s*"([^"]+)"')
+      new RegExp('operationName:\\s*"' + op + '"\\s*,\\s*queryId:\\s*"([^"]+)"'),
+      new RegExp('params:\\s*\\{\\s*id:\\s*"([^"]+)"\\s*,\\s*metadata:\\s*\\{[^}]*\\}\\s*,\\s*name:\\s*"' + op + '"'),
+      new RegExp('name:\\s*"' + op + '"[^}]*operationKind:\\s*"(?:query|mutation)"[^}]*id:\\s*"([^"]+)"')
     ];
     for (const id of Object.keys(req.m)) {
       try {
